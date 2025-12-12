@@ -1,17 +1,27 @@
 import streamlit as st
 import PyPDF2
 import io
-from langchain_text_splitters import RecursiveCharacterTextSplitter, CharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import FAISS
-from langchain.chat_models import ChatOpenAI
+import os
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_community.vectorstores import FAISS
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.prompts import ChatPromptTemplate
 
-
-OPENAI_API_KEY = "Your OpenAI API Key"
-
+# Initialize session state for storing data between reruns
+if "chunks" not in st.session_state:
+    st.session_state.chunks = None
+if "vector_store" not in st.session_state:
+    st.session_state.vector_store = None
 
 st.title("Chatbot")
 st.header("My first Chatbot")
+
+# API key input
+with st.sidebar:
+    api_key = st.text_input("Enter your OpenAI API key", type="password")
+    os.environ["OPENAI_API_KEY"] = api_key
 
 # Function to extract text from PDF
 def extract_text_from_pdf(pdf_file):
@@ -27,7 +37,7 @@ with st.sidebar:
     st.title("Your Documents")
     pdf_file = st.file_uploader("Upload your documents", type=["pdf"])
 
-# Process uploaded file
+# Only process if PDF uploaded and API key provided
 if pdf_file is not None:
     # Display file details
     file_details = {
@@ -43,59 +53,80 @@ if pdf_file is not None:
         text = extract_text_from_pdf(pdf_file)
     
     # Display extracted text
-    st.write("### Extracted Text")
-    st.text_area("PDF Content", text, height=400)
+    with st.expander("View Extracted Text"):
+        st.text_area("PDF Content", text, height=300)
 
-# split into chunks
-with st.spinner("Splitting text into chunks..."):
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
-        length_function=len,
-        is_separator_regex=False,
-    )
-    chunks = text_splitter.split_text(text)
-st.write("### Text Chunks")
-st.write(f"Number of chunks: {len(chunks)}")
-st.write(chunks)
+    # Split into chunks
+    with st.spinner("Splitting text into chunks..."):
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+            length_function=len,
+        )
+        chunks = text_splitter.split_text(text)
+        st.session_state.chunks = chunks
+    
+    st.write(f"Split into {len(chunks)} chunks")
+    
+    # Only create embeddings if API key is provided
+    if api_key:
+        try:
+            # Create embeddings using OpenAI
+            with st.spinner("Creating embeddings..."):
+                embeddings = OpenAIEmbeddings()
+                
+            # Create vector store
+            with st.spinner("Creating vector store..."):
+                vector_store = FAISS.from_texts(chunks, embeddings)
+                st.session_state.vector_store = vector_store
+            
+            st.success("Vector store created successfully!")
+        except Exception as e:
+            st.error(f"Error creating embeddings: {e}")
+    else:
+        st.warning("Please provide an OpenAI API key to create embeddings.")
 
-# Create embeddings using OpenAI
-with st.spinner("Creating embeddings..."):
-    embeddings = OpenAIEmbeddings(
-        model_name="text-embedding-ada-002",
-        api_key=OPENAI_API_KEY
-    )
-        
-# Create vector store
-with st.spinner("Creating vector store..."):
-    vector_store = FAISS.from_texts(chunks, embeddings)
-st.write("### Vector Store")
-st.write(vector_store)
-
-# Get user question
+# Chat interface
+st.write("### Chat with your document")
 user_question = st.text_input("Ask a question about your documents")
 
-# Do a similarity search
-with st.spinner("Searching for similar documents..."):
-    similar_docs = vector_store.similarity_search(user_question, k=5)
-st.write("### Similar Documents")
-st.write(similar_docs)
-
-# Create chatbot
-chatbot = ChatOpenAI(
-    model_name="gpt-3.5-turbo",
-    api_key=OPENAI_API_KEY
-    temperature=0,
-    max_tokens=1000,
-)
-
-# Generate response using chatbot
-with st.spinner("Generating response..."):
-    response = chatbot.generate_text(user_question, search_results=similar_docs)
-st.write("### Response")
-st.write(response)
-
-
-
+if user_question and st.session_state.vector_store and api_key:
+    try:
+        # Create retrieval chain
+        retriever = st.session_state.vector_store.as_retriever(search_kwargs={"k": 3})
         
+        # Create prompt template
+        template = """Answer the question based only on the following context:
+        {context}
         
+        Question: {question}
+        """
+        prompt = ChatPromptTemplate.from_template(template)
+        
+        # Create model
+        model = ChatOpenAI(
+            model_name="gpt-3.5-turbo",
+            temperature=0,
+        )
+        
+        # Create chain
+        chain = (
+            {"context": retriever, "question": RunnablePassthrough()}
+            | prompt
+            | model
+            | StrOutputParser()
+        )
+        
+        # Generate response
+        with st.spinner("Generating response..."):
+            response = chain.invoke(user_question)
+        
+        st.write("### Response")
+        st.write(response)
+    except Exception as e:
+        st.error(f"Error generating response: {e}")
+elif user_question:
+    if not api_key:
+        st.warning("Please provide an OpenAI API key to use the chat feature.")
+    if not st.session_state.vector_store:
+        st.warning("Please upload a PDF document first.")
