@@ -1,6 +1,7 @@
 # Artificial Intelligence, Machine Learning, and Deep Learning
 
-<img width="849" height="810" alt="image" src="https://github.com/user-attachments/assets/20560365-65ad-40ec-9005-ecd190d292f2" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/20560365-65ad-40ec-9005-ecd190d292f2" />
+
 
 
 Artificial Intelligence (AI), Machine Learning (ML), and Deep Learning (DL) are related but distinct concepts. They can be viewed as layers in a hierarchy: AI ➝ ML ➝ DL, where each deeper layer becomes more specialized and data-driven.
@@ -43,7 +44,7 @@ def classify_age(age):
 
 ## 2. What Is Machine Learning (ML)?
 
-<img width="1153" height="684" alt="image" src="https://github.com/user-attachments/assets/422d6f16-6b24-40c1-b94b-e92f0c56e42b" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/422d6f16-6b24-40c1-b94b-e92f0c56e42b" />
 
 
 Machine Learning is a subset of AI where systems learn patterns from data instead of relying only on hard-coded rules.
@@ -78,7 +79,7 @@ print(model.predict([])) #
 
 ## 3. What Is Deep Learning (DL)?
 
-<img width="1175" height="520" alt="image" src="https://github.com/user-attachments/assets/f30e0a27-1859-47af-87a2-8988909cf105" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/f30e0a27-1859-47af-87a2-8988909cf105" />
 
 
 Deep Learning is a subset of ML that relies on neural networks with many layers (deep neural networks).
